@@ -75,7 +75,7 @@ namespace EventFlow.MsSql.ReliablePublish
                 var state = await GetPreviousVerifyStateAndLockItAsync(db, transaction).ConfigureAwait(false);
                 var position = new GlobalPosition(state.LastVerifiedPosition);
 
-                var logItemLookup = await GetLogItemsAsync(db, transaction);
+                var logItemLookup = await GetLogItemsAsync(cancellationToken);
 
                 page = await _eventPersistence.LoadAllCommittedEvents(position, PageSize, cancellationToken)
                     .ConfigureAwait(false);
@@ -156,11 +156,13 @@ namespace EventFlow.MsSql.ReliablePublish
             return new VerifyResult(unpublishedEvents, publishedLogItems);
         }
 
-        private static async Task<ILookup<string, PublishLogItem>> GetLogItemsAsync(IDbConnection db, IDbTransaction transaction)
+        private async Task<ILookup<string, PublishLogItem>> GetLogItemsAsync(CancellationToken cancellationToken)
         {
-            var logItems = await db.QueryAsync<PublishLogItem>(
-                    "SELECT [Id], [AggregateId],[MinAggregateSequenceNumber], [MaxAggregateSequenceNumber] FROM [dbo].[EventFlowPublishLog]",
-                    transaction: transaction)
+            var logItems = await _msSqlConnection.QueryAsync<PublishLogItem>(
+                    Label.Named("publishlog-select"),
+                    cancellationToken,
+                    "SELECT TOP(@Top) [Id], [AggregateId],[MinAggregateSequenceNumber], [MaxAggregateSequenceNumber] FROM [dbo].[EventFlowPublishLog] ORDER BY [Id]",
+                    new { Top = PageSize })
                 .ConfigureAwait(false);
 
             return logItems.ToLookup(x => x.AggregateId);
