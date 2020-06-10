@@ -21,27 +21,34 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using EventFlow.Configuration;
-using EventFlow.PublishRecovery;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using EventFlow.Aggregates;
 using EventFlow.Subscribers;
 
-namespace EventFlow.Extensions
+namespace EventFlow.PublishRecovery
 {
-    public static class EventFlowOptionsReliablePublishingExtensions
+    public sealed class PublishRecoveryProcessor : IPublishRecoveryProcessor
     {
-        public static IEventFlowOptions UseReliablePublishing<TReliablePublishPersistence>(
-            this IEventFlowOptions eventFlowOptions,
-            Lifetime lifetime = Lifetime.AlwaysUnique)
-            where TReliablePublishPersistence : class, IReliablePublishPersistence
+        private readonly IDomainEventPublisher _domainEventPublisher;
+
+        public PublishRecoveryProcessor(IDomainEventPublisher domainEventPublisher)
         {
-            return eventFlowOptions
-                .RegisterServices(f => f.Register<IReliableMarkProcessor, ReliableMarkProcessor>())
-                .RegisterServices(f => f.Register<IPublishVerificator, PublishVerificator>())
-                .RegisterServices(f => f.Register<IPublishRecoveryProcessor, PublishRecoveryProcessor>())
-                .RegisterServices(r => r.Register<IRecoveryDetector, TimeBasedRecoveryDetector>())
-                .RegisterServices(f => f.Register<IReliablePublishPersistence, TReliablePublishPersistence>(lifetime))
-                .RegisterServices(f => f.Decorate<IDomainEventPublisher>(
-                                      (context, inner) => new ReliableDomainEventPublisher(inner, context.Resolver.Resolve<IReliableMarkProcessor>())));
+            _domainEventPublisher = domainEventPublisher;
+        }
+
+        public async Task RecoverEventsAsync(IReadOnlyList<IDomainEvent> eventsForRecovery, CancellationToken cancellationToken)
+        {
+            var groupByIdentities = eventsForRecovery.GroupBy(x => x.GetIdentity());
+
+            foreach (var groupByIdentity in groupByIdentities)
+            {
+                // Potentially it is possible to publish events simultaniously,
+                // but for stability results do it serially
+                await _domainEventPublisher.PublishAsync(groupByIdentity.ToList(), cancellationToken);
+            }
         }
     }
 }

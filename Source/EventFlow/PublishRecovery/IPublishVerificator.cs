@@ -21,13 +21,13 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-namespace EventFlow.MsSql.ReliablePublish
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace EventFlow.PublishRecovery
 {
-    public sealed class PublishLogItem
+    public interface IPublishVerificator
     {
-        public long Id { get; set; }
-        public string AggregateId { get; set; }
-        public int MinAggregateSequenceNumber { get; set; }
-        public int MaxAggregateSequenceNumber { get; set; }
+        Task<PublishVerificationResult> VerifyOnceAsync(CancellationToken cancellationToken);
     }
 }

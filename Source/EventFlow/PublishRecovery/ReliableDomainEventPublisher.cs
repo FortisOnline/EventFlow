@@ -27,8 +27,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
 using EventFlow.Core;
+using EventFlow.Subscribers;
 
-namespace EventFlow.Subscribers
+namespace EventFlow.PublishRecovery
 {
     public sealed class ReliableDomainEventPublisher : IDomainEventPublisher
     {
@@ -45,7 +46,7 @@ namespace EventFlow.Subscribers
         {
             await _nonReliableDomainEventPublisher.PublishAsync(domainEvents, cancellationToken).ConfigureAwait(false);
 
-            await _reliableMarkProcessor.MarkPublishedWithSuccess(domainEvents);
+            await _reliableMarkProcessor.MarkEventsPublishedAsync(domainEvents);
         }
 
         [Obsolete("Use PublishAsync (without generics and aggregate identity)")]
@@ -54,7 +55,7 @@ namespace EventFlow.Subscribers
         {
             await _nonReliableDomainEventPublisher.PublishAsync<TAggregate, TIdentity>(id, domainEvents, cancellationToken);
 
-            await _reliableMarkProcessor.MarkPublishedWithSuccess(domainEvents);
+            await _reliableMarkProcessor.MarkEventsPublishedAsync(domainEvents);
         }
     }
 }

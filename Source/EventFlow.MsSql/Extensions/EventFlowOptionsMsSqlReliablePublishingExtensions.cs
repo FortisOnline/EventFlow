@@ -31,8 +31,7 @@ namespace EventFlow.MsSql.Extensions
         public static IEventFlowOptions UseMssqlReliablePublishing(this IEventFlowOptions eventFlowOptions)
         {
             return eventFlowOptions
-                .UseReliablePublishing<MsSqlReliableMarkProcessor, MsSqlPublishVerificator>()
-                .RegisterServices(r => r.Register<IRecoveryDetector, TimeBasedRecoveryDetector>());
+                .UseReliablePublishing<MsSqlReliablePublishPersistence>();
         }
     }
 }

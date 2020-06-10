@@ -21,18 +21,14 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using EventFlow.Aggregates;
 
-namespace EventFlow.MsSql.ReliablePublish
+namespace EventFlow.PublishRecovery
 {
-    public sealed class TimeBasedRecoveryDetector : IRecoveryDetector
+    public interface IReliableMarkProcessor
     {
-        public TimeSpan DelayToNeedRecover { get; set; } = TimeSpan.FromMinutes(5);
-
-        public bool IsNeedRecovery(IDomainEvent evnt)
-        {
-            return DateTimeOffset.UtcNow - evnt.Timestamp > DelayToNeedRecover;
-        }
+        Task MarkEventsPublishedAsync(IReadOnlyCollection<IDomainEvent> domainEvents);
     }
 }

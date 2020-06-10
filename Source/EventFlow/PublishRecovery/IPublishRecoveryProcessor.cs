@@ -26,7 +26,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
 
-namespace EventFlow.Subscribers
+namespace EventFlow.PublishRecovery
 {
     public interface IPublishRecoveryProcessor
     {

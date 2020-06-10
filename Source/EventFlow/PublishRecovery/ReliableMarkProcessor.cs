@@ -21,13 +21,36 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using System.Threading;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
+using EventFlow.Aggregates;
 
-namespace EventFlow.Subscribers
+namespace EventFlow.PublishRecovery
 {
-    public interface IPublishVerificator
+    public sealed class ReliableMarkProcessor : IReliableMarkProcessor
     {
-        Task<PublishVerificationResult> VerifyOnceAsync(CancellationToken cancellationToken);
+        private readonly IReliablePublishPersistence _reliablePublishPersistence;
+
+        public ReliableMarkProcessor(IReliablePublishPersistence reliablePublishPersistence)
+        {
+            _reliablePublishPersistence = reliablePublishPersistence;
+        }
+
+        public async Task MarkEventsPublishedAsync(IReadOnlyCollection<IDomainEvent> domainEvents)
+        {
+            var count = domainEvents.Count;
+            if (count == 0)
+            {
+                return;
+            }
+
+            foreach (var domaiEnventsPerAggregate in domainEvents.GroupBy(x => x.GetIdentity()))
+            {
+                var aggregateIdentity = domaiEnventsPerAggregate.Key;
+
+                await _reliablePublishPersistence.MarkPublishedAsync(aggregateIdentity, domainEvents).ConfigureAwait(false);
+            }
+        }
     }
 }

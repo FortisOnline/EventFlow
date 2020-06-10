@@ -21,27 +21,18 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using EventFlow.Configuration;
-using EventFlow.PublishRecovery;
-using EventFlow.Subscribers;
+using System;
+using EventFlow.Aggregates;
 
-namespace EventFlow.Extensions
+namespace EventFlow.PublishRecovery
 {
-    public static class EventFlowOptionsReliablePublishingExtensions
+    public sealed class TimeBasedRecoveryDetector : IRecoveryDetector
     {
-        public static IEventFlowOptions UseReliablePublishing<TReliablePublishPersistence>(
-            this IEventFlowOptions eventFlowOptions,
-            Lifetime lifetime = Lifetime.AlwaysUnique)
-            where TReliablePublishPersistence : class, IReliablePublishPersistence
+        public TimeSpan DelayToNeedRecover { get; set; } = TimeSpan.FromMinutes(5);
+
+        public bool IsNeedRecovery(IDomainEvent domainEvent)
         {
-            return eventFlowOptions
-                .RegisterServices(f => f.Register<IReliableMarkProcessor, ReliableMarkProcessor>())
-                .RegisterServices(f => f.Register<IPublishVerificator, PublishVerificator>())
-                .RegisterServices(f => f.Register<IPublishRecoveryProcessor, PublishRecoveryProcessor>())
-                .RegisterServices(r => r.Register<IRecoveryDetector, TimeBasedRecoveryDetector>())
-                .RegisterServices(f => f.Register<IReliablePublishPersistence, TReliablePublishPersistence>(lifetime))
-                .RegisterServices(f => f.Decorate<IDomainEventPublisher>(
-                                      (context, inner) => new ReliableDomainEventPublisher(inner, context.Resolver.Resolve<IReliableMarkProcessor>())));
+            return DateTimeOffset.UtcNow - domainEvent.Timestamp > DelayToNeedRecover;
         }
     }
 }

@@ -32,6 +32,7 @@ using EventFlow.Core;
 using EventFlow.Extensions;
 using EventFlow.MsSql.Extensions;
 using EventFlow.MsSql.ReliablePublish;
+using EventFlow.PublishRecovery;
 using EventFlow.Subscribers;
 using EventFlow.TestHelpers;
 using EventFlow.TestHelpers.Aggregates;
@@ -47,7 +48,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
     {
         private IMsSqlDatabase _testDatabase;
         private TestPublisher _publisher;
-        private MsSqlPublishVerificator _publishVerificator;
+        private PublishVerificator _publishVerificator;
 
         protected override IRootResolver CreateRootResolver(IEventFlowOptions eventFlowOptions)
         {
@@ -69,7 +70,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             databaseMigrator.MigrateDatabaseUsingEmbeddedScripts(GetType().Assembly);
 
             _publisher = (TestPublisher)resolver.Resolve<IDomainEventPublisher>();
-            _publishVerificator = (MsSqlPublishVerificator)resolver.Resolve<IPublishVerificator>();
+            _publishVerificator = (PublishVerificator)resolver.Resolve<IPublishVerificator>();
 
             return resolver;
         }
@@ -90,7 +91,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
             // Act
             _publisher.SimulatePublishFailure = false;
-            await _publishVerificator.VerifyOnceAsync(CancellationToken.None).ConfigureAwait(false);
+            await Verify().ConfigureAwait(false);
 
             // Assert
             _publisher.PublishedEvents.Should().NotBeEmpty();
@@ -209,7 +210,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
         private sealed class AlwaysRecoverDetector : IRecoveryDetector
         {
-            public bool IsNeedRecovery(IDomainEvent evnt)
+            public bool IsNeedRecovery(IDomainEvent domainEvent)
             {
                 return true;
             }

@@ -21,27 +21,21 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using EventFlow.Configuration;
-using EventFlow.PublishRecovery;
-using EventFlow.Subscribers;
+using System.Collections.Generic;
+using EventFlow.EventStores;
 
-namespace EventFlow.Extensions
+namespace EventFlow.PublishRecovery
 {
-    public static class EventFlowOptionsReliablePublishingExtensions
+    public class VerificationState
     {
-        public static IEventFlowOptions UseReliablePublishing<TReliablePublishPersistence>(
-            this IEventFlowOptions eventFlowOptions,
-            Lifetime lifetime = Lifetime.AlwaysUnique)
-            where TReliablePublishPersistence : class, IReliablePublishPersistence
+        public VerificationState(GlobalPosition position, IReadOnlyCollection<IPublishVerificationItem> items)
         {
-            return eventFlowOptions
-                .RegisterServices(f => f.Register<IReliableMarkProcessor, ReliableMarkProcessor>())
-                .RegisterServices(f => f.Register<IPublishVerificator, PublishVerificator>())
-                .RegisterServices(f => f.Register<IPublishRecoveryProcessor, PublishRecoveryProcessor>())
-                .RegisterServices(r => r.Register<IRecoveryDetector, TimeBasedRecoveryDetector>())
-                .RegisterServices(f => f.Register<IReliablePublishPersistence, TReliablePublishPersistence>(lifetime))
-                .RegisterServices(f => f.Decorate<IDomainEventPublisher>(
-                                      (context, inner) => new ReliableDomainEventPublisher(inner, context.Resolver.Resolve<IReliableMarkProcessor>())));
+            Position = position;
+            Items = items;
         }
+
+        public GlobalPosition Position { get; }
+
+        public IReadOnlyCollection<IPublishVerificationItem> Items { get; }
     }
 }

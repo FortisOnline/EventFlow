@@ -21,12 +21,21 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using EventFlow.Aggregates;
+using EventFlow.Core;
+using EventFlow.EventStores;
 
-namespace EventFlow.MsSql.ReliablePublish
+namespace EventFlow.PublishRecovery
 {
-    public interface IRecoveryDetector
+    public interface IReliablePublishPersistence
     {
-        bool IsNeedRecovery(IDomainEvent evnt);
+        Task MarkPublishedAsync(IIdentity aggregateIdentity, IReadOnlyCollection<IDomainEvent> domainEvents);
+
+        Task<VerificationState> GetUnverifiedItemsAsync(int maxCount, CancellationToken cancellationToken);
+
+        Task MarkVerifiedAsync(IReadOnlyCollection<IPublishVerificationItem> verifiedItems, GlobalPosition newVerifiedPosition, CancellationToken cancellationToken);
     }
 }
