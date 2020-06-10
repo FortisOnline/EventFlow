@@ -23,7 +23,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
@@ -36,7 +35,6 @@ using EventFlow.PublishRecovery;
 using EventFlow.Subscribers;
 using EventFlow.TestHelpers;
 using EventFlow.TestHelpers.Aggregates;
-using EventFlow.TestHelpers.Aggregates.Events;
 using EventFlow.TestHelpers.MsSql;
 using FluentAssertions;
 using NUnit.Framework;
@@ -49,6 +47,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
         private IMsSqlDatabase _testDatabase;
         private TestPublisher _publisher;
         private PublishVerificator _publishVerificator;
+        private RecoveryHandlerForTest _recoveryHandler;
 
         protected override IRootResolver CreateRootResolver(IEventFlowOptions eventFlowOptions)
         {
@@ -59,6 +58,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             var resolver = eventFlowOptions
                 .ConfigureMsSql(MsSqlConfiguration.New.SetConnectionString(_testDatabase.ConnectionString.Value))
                 .UseMssqlReliablePublishing()
+                .UseRecoveryHandler<RecoveryHandlerForTest>(Lifetime.Singleton)
                 .RegisterServices(sr => sr.Decorate<IDomainEventPublisher>(
                                       (r, dea) =>
                                           _publisher ?? (_publisher = new TestPublisher(dea))))
@@ -71,6 +71,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
             _publisher = (TestPublisher)resolver.Resolve<IDomainEventPublisher>();
             _publishVerificator = (PublishVerificator)resolver.Resolve<IPublishVerificator>();
+            _recoveryHandler = (RecoveryHandlerForTest)resolver.Resolve<IRecoveryHandler>();
 
             return resolver;
         }
@@ -94,7 +95,8 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             await Verify().ConfigureAwait(false);
 
             // Assert
-            _publisher.PublishedEvents.Should().NotBeEmpty();
+            _recoveryHandler.RecoveredEvents.Should()
+                .BeEquivalentTo(_publisher.NotPublishedEvents);
         }
 
         [Test]
@@ -114,25 +116,6 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
         }
 
         [Test]
-        public async Task ShouldRecoveredOnceForSimultaniousVerification()
-        {
-            // Arrange
-            var id = ThingyId.New;
-            _publisher.SimulatePublishFailure = true;
-            await PublishPingCommandsAsync(id, 1).ConfigureAwait(false);
-
-            // Act
-            var tasks = Enumerable.Range(0, 10).Select(x => Verify());
-
-            _publisher.SimulatePublishFailure = false;
-
-            await Task.WhenAll(tasks).ConfigureAwait(false);
-
-            // Assert
-            _publisher.PublishedEvents.Should().ContainSingle(x => x.GetAggregateEvent() is ThingyPingEvent);
-        }
-
-        [Test]
         public async Task ShouldNotRecoverAfterFailureWithoutVerificator()
         {
             // Arrange
@@ -143,7 +126,13 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             await PublishPingCommandsAsync(id, 1).ConfigureAwait(false);
 
             // Assert
-            _publisher.PublishedEvents.Should().BeEmpty();
+            _recoveryHandler.RecoveredEvents.Should().BeEmpty();
+        }
+
+        [Test]
+        public void ShouldRemoveOutdatedLogItems()
+        {
+            throw new NotImplementedException();
         }
 
         private async Task Verify()
@@ -153,6 +142,24 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             {
                 result = await _publishVerificator.VerifyOnceAsync(CancellationToken.None).ConfigureAwait(false);
             } while (result != PublishVerificationResult.CompletedNoMoreDataToVerify);
+        }
+
+        private class RecoveryHandlerForTest : IRecoveryHandler
+        {
+            private readonly List<IDomainEvent> _recoveredEvents = new List<IDomainEvent>();
+            public IReadOnlyList<IDomainEvent> RecoveredEvents => _recoveredEvents;
+
+            public bool CanProcess(IDomainEvent domainEvent)
+            {
+                return true;
+            }
+
+            public Task RecoverFromShutdownAsync(IReadOnlyCollection<IDomainEvent> domainEvents, CancellationToken cancellationToken)
+            {
+                _recoveredEvents.AddRange(domainEvents);
+
+                return Task.FromResult(0);
+            }
         }
 
         private class TestPublisher : IDomainEventPublisher
@@ -170,6 +177,8 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
             public IReadOnlyList<IDomainEvent> PublishedEvents => _publishedEvents;
 
+            public IReadOnlyList<IDomainEvent> NotPublishedEvents => _notPublishedEvents;
+
             public async Task PublishAsync(IReadOnlyCollection<IDomainEvent> domainEvents, CancellationToken cancellationToken)
             {
                 if (SimulatePublishFailure)
@@ -180,7 +189,6 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
                 await _inner.PublishAsync(domainEvents, cancellationToken);
 
-                _notPublishedEvents.RemoveAll(evnt => domainEvents.Contains(evnt, CompareEventById.Instance));
                 _publishedEvents.AddRange(domainEvents);
             }
 

@@ -21,34 +21,58 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
-using EventFlow.Subscribers;
+using EventFlow.Configuration;
 
 namespace EventFlow.PublishRecovery
 {
-    public sealed class PublishRecoveryProcessor : IPublishRecoveryProcessor
+    public sealed class RecoveryHandlerProcessor : IPublishRecoveryProcessor
     {
-        private readonly IDomainEventPublisher _domainEventPublisher;
+        private readonly IReliableMarkProcessor _markProcessor;
+        private readonly IResolver _resolver;
 
-        public PublishRecoveryProcessor(IDomainEventPublisher domainEventPublisher)
+        public RecoveryHandlerProcessor(IResolver resolver, IReliableMarkProcessor markProcessor)
         {
-            _domainEventPublisher = domainEventPublisher;
+            _resolver = resolver;
+            _markProcessor = markProcessor;
         }
 
         public async Task RecoverEventsAsync(IReadOnlyList<IDomainEvent> eventsForRecovery, CancellationToken cancellationToken)
         {
-            var groupByIdentities = eventsForRecovery.GroupBy(x => x.GetIdentity());
+            var recoveryHandlers = _resolver.Resolve<IEnumerable<IRecoveryHandler>>();
 
-            foreach (var groupByIdentity in groupByIdentities)
+            if (!recoveryHandlers.Any())
             {
-                // Potentially it is possible to publish events simultaniously,
-                // but for stability results do it serially
-                await _domainEventPublisher.PublishAsync(groupByIdentity.ToList(), cancellationToken);
+                throw new Exception("No any recovery handlers registered.");
             }
+
+            var anyRecovered = false;
+
+            foreach (var handler in recoveryHandlers)
+            {
+                var events = eventsForRecovery
+                    .Where(evnt => handler.CanProcess(evnt))
+                    .ToList();
+
+                if (events.Any())
+                {
+                    anyRecovered = true;
+                    await handler.RecoverFromShutdownAsync(events, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            if (!anyRecovered)
+            {
+                throw new Exception("No events recovered");
+            }
+
+            // TODO: Rethink as now we mark as recovered all events even no suitable recovery handler found.
+            await _markProcessor.MarkEventsPublishedAsync(eventsForRecovery).ConfigureAwait(false);
         }
     }
 }
