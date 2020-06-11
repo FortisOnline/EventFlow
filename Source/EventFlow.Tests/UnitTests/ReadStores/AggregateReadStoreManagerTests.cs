@@ -161,8 +161,7 @@ namespace EventFlow.Tests.UnitTests.ReadStores
                     ReadModelWithoutEvents>(null, null, null, null, null);
             };
 
-            a.Should().Throw<TypeInitializationException>().WithInnerException<Exception>()
-                .WithInnerException<Exception>().WithMessage("*does not implement any*");
+            a.Should().Throw<TypeInitializationException>().WithInnerException<Exception>().WithMessage("*does not implement any*");
         }
 
         [Test]
@@ -174,8 +173,7 @@ namespace EventFlow.Tests.UnitTests.ReadStores
                     ReadModelWithAmbigiousEvents>(null, null, null, null, null);
             };
 
-            a.Should().Throw<TypeInitializationException>().WithInnerException<Exception>()
-                .WithInnerException<Exception>().WithMessage("*implements ambiguous*");
+            a.Should().Throw<TypeInitializationException>().WithInnerException<Exception>().WithMessage("*implements ambiguous*");
         }
 
         private class ReadModelWithoutEvents : IReadModel

@@ -20,7 +20,6 @@
 // COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-//
 
 using System;
 using System.Collections.Generic;
@@ -40,37 +39,9 @@ namespace EventFlow.ReadStores
 
         static ReadModelEventHelper()
         {
-            var readModelType = typeof(TReadModel);
-
-            var iAmReadModelForInterfaceTypes = readModelType
-                .GetTypeInfo()
-                .GetInterfaces()
-                .Where(IsReadModelFor)
-                .ToList();
-            if (!iAmReadModelForInterfaceTypes.Any())
-            {
-                throw new ArgumentException(
-                    $"Read model type '{readModelType.PrettyPrint()}' does not implement any '{typeof(IAmReadModelFor<,,>).PrettyPrint()}'");
-            }
+            var iAmReadModelForInterfaceTypes = GetIamReadModelInterfaces();
 
             AggregateEventTypes = new HashSet<Type>(iAmReadModelForInterfaceTypes.Select(i => i.GetTypeInfo().GetGenericArguments()[2]));
-            if (AggregateEventTypes.Count != iAmReadModelForInterfaceTypes.Count)
-            {
-                throw new ArgumentException(
-                    $"Read model type '{readModelType.PrettyPrint()}' implements ambiguous '{typeof(IAmReadModelFor<,,>).PrettyPrint()}' interfaces");
-            }
-        }
-
-        private static bool IsReadModelFor(Type i)
-        {
-            if (!i.GetTypeInfo().IsGenericType)
-            {
-                return false;
-            }
-
-            var typeDefinition = i.GetGenericTypeDefinition();
-            return typeDefinition == typeof(IAmReadModelFor<,,>) ||
-                   typeDefinition == typeof(IAmAsyncReadModelFor<,,>);
         }
 
         public static bool CanApply(IDomainEvent domainEvent)
@@ -83,9 +54,42 @@ namespace EventFlow.ReadStores
             return AggregateEventTypes.Contains(domainEventType);
         }
 
-        // Dummy mehtod, all initialization performed in static constructor
-        public static void Nop()
+        public static void CheckReadModel()
         {
+            if (!AggregateEventTypes.Any())
+            {
+                throw new ArgumentException(
+                    $"Read model type '{typeof(TReadModel).PrettyPrint()}' does not implement any '{typeof(IAmReadModelFor<,,>).PrettyPrint()}'");
+            }
+
+            if (AggregateEventTypes.Count != GetIamReadModelInterfaces().Count)
+            {
+                throw new ArgumentException(
+                    $"Read model type '{typeof(TReadModel).PrettyPrint()}' implements ambiguous '{typeof(IAmReadModelFor<,,>).PrettyPrint()}' interfaces");
+            }
+        }
+
+        private static IReadOnlyList<Type> GetIamReadModelInterfaces()
+        {
+            var readModelType = typeof(TReadModel);
+
+            return readModelType
+                .GetTypeInfo()
+                .GetInterfaces()
+                .Where(IsReadModelFor)
+                .ToList();
+        }
+
+        private static bool IsReadModelFor(Type i)
+        {
+            if (!i.GetTypeInfo().IsGenericType)
+            {
+                return false;
+            }
+
+            var typeDefinition = i.GetGenericTypeDefinition();
+            return typeDefinition == typeof(IAmReadModelFor<,,>) ||
+                   typeDefinition == typeof(IAmAsyncReadModelFor<,,>);
         }
     }
 }
