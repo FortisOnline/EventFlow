@@ -32,6 +32,8 @@ using EventFlow.Extensions;
 using EventFlow.MsSql.Extensions;
 using EventFlow.MsSql.ReliablePublish;
 using EventFlow.PublishRecovery;
+using EventFlow.ReadStores;
+using EventFlow.Sagas;
 using EventFlow.Subscribers;
 using EventFlow.TestHelpers;
 using EventFlow.TestHelpers.Aggregates;
@@ -58,7 +60,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             var resolver = eventFlowOptions
                 .ConfigureMsSql(MsSqlConfiguration.New.SetConnectionString(_testDatabase.ConnectionString.Value))
                 .UseMssqlReliablePublishing()
-                .UseRecoveryHandler<RecoveryHandlerForTest>(Lifetime.Singleton)
+                .RegisterServices(sr => sr.Register<IRecoveryHandlerProcessor, RecoveryHandlerForTest>(Lifetime.Singleton))
                 .RegisterServices(sr => sr.Decorate<IDomainEventPublisher>(
                                       (r, dea) =>
                                           _publisher ?? (_publisher = new TestPublisher(dea))))
@@ -71,7 +73,7 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
             _publisher = (TestPublisher)resolver.Resolve<IDomainEventPublisher>();
             _publishVerificator = (PublishVerificator)resolver.Resolve<IPublishVerificator>();
-            _recoveryHandler = (RecoveryHandlerForTest)resolver.Resolve<IRecoveryHandler>();
+            _recoveryHandler = (RecoveryHandlerForTest)resolver.Resolve<IRecoveryHandlerProcessor>();
 
             return resolver;
         }
@@ -144,21 +146,53 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             } while (result != PublishVerificationResult.CompletedNoMoreDataToVerify);
         }
 
-        private class RecoveryHandlerForTest : IRecoveryHandler
+        private class RecoveryHandlerForTest : IRecoveryHandlerProcessor
         {
             private readonly List<IDomainEvent> _recoveredEvents = new List<IDomainEvent>();
-            public IReadOnlyList<IDomainEvent> RecoveredEvents => _recoveredEvents;
+            private readonly IReliableMarkProcessor _markProcessor;
 
-            public bool CanProcess(IDomainEvent domainEvent)
+            public RecoveryHandlerForTest(IReliableMarkProcessor markProcessor)
             {
-                return true;
+                _markProcessor = markProcessor;
             }
 
-            public Task RecoverFromShutdownAsync(IReadOnlyCollection<IDomainEvent> domainEvents, CancellationToken cancellationToken)
-            {
-                _recoveredEvents.AddRange(domainEvents);
+            public IReadOnlyList<IDomainEvent> RecoveredEvents => _recoveredEvents;
 
-                return Task.FromResult(0);
+            public Task RecoverAfterUnexpectedShutdownAsync(IReadOnlyList<IDomainEvent> eventsForRecovery, CancellationToken cancellationToken)
+            {
+                _recoveredEvents.AddRange(eventsForRecovery);
+
+                return _markProcessor.MarkEventsPublishedAsync(eventsForRecovery);
+            }
+
+            public Task<bool> RecoverReadModelUpdateErrorAsync(IReadStoreManager readModelType, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+                Exception exception, CancellationToken cancellationToken)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task<bool> RecoverAllSubscriberErrorAsync(IReadOnlyCollection<IDomainEvent> eventsForRecovery, Exception exception,
+                CancellationToken cancellationToken)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task<bool> RecoverSubscriberErrorAsync(object subscriber, IDomainEvent eventForRecovery, Exception exception,
+                CancellationToken cancellationToken)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task<bool> RecoverScheduleSubscriberErrorAsync(IReadOnlyCollection<IDomainEvent> eventsForRecovery, Exception exception,
+                CancellationToken cancellationToken)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task<bool> RecoverSagaErrorAsync(ISagaId eventsForRecovery, SagaDetails exception, IDomainEvent cancellationToken,
+                Exception exception1, CancellationToken cancellationToken1)
+            {
+                throw new NotImplementedException();
             }
         }
 

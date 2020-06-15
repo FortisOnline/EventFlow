@@ -21,16 +21,39 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using EventFlow.Aggregates;
 using EventFlow.ReadStores;
 
 namespace EventFlow.PublishRecovery
 {
-    public interface IReadModelRecoveryHandler : IRecoveryHandler
-    {
-    }
+    public delegate Task NextRecoverShutdownHandlerAsync(
+        IReadStoreManager readStoreManager,
+        IReadOnlyCollection<IDomainEvent> domainEvents,
+        CancellationToken cancellationToken);
 
-    public interface IReadModelRecoveryHandler<TReadModel> : IReadModelRecoveryHandler
-        where TReadModel : class, IReadModel
+    public delegate Task<bool> NextRecoverErrorHandlerAsync(
+        IReadStoreManager readStoreManager,
+        IReadOnlyCollection<IDomainEvent> domainEvents,
+        Exception exception,
+        CancellationToken cancellationToken);
+
+    public interface IReadModelRecoveryHandler
     {
+        Task RecoverFromShutdownAsync(
+            IReadStoreManager readStoreManager,
+            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            NextRecoverShutdownHandlerAsync nextHandler,
+            CancellationToken cancellationToken);
+
+        Task<bool> RecoverFromErrorAsync(
+            IReadStoreManager readStoreManager,
+            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            Exception exception,
+            NextRecoverErrorHandlerAsync nextHandler,
+            CancellationToken cancellationToken);
     }
 }

@@ -21,15 +21,27 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
+using EventFlow.ReadStores;
 
 namespace EventFlow.PublishRecovery
 {
-    public interface IPublishRecoveryProcessor
+    public sealed class NoRecoveryHandler : IReadModelRecoveryHandler
     {
-        Task RecoverEventsAsync(IReadOnlyList<IDomainEvent> eventsForRecovery, CancellationToken cancellationToken);
+        public Task RecoverFromShutdownAsync(IReadStoreManager readStoreManager, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            NextRecoverShutdownHandlerAsync nextHandler, CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException("Unable to recover after shutdown.");
+        }
+
+        public Task<bool> RecoverFromErrorAsync(IReadStoreManager readStoreManager, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            Exception exception, NextRecoverErrorHandlerAsync nextHandler, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(false);
+        }
     }
 }

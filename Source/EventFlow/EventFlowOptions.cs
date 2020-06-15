@@ -40,6 +40,7 @@ using EventFlow.Extensions;
 using EventFlow.Jobs;
 using EventFlow.Logs;
 using EventFlow.Provided;
+using EventFlow.PublishRecovery;
 using EventFlow.Queries;
 using EventFlow.ReadStores;
 using EventFlow.Sagas;
@@ -216,6 +217,9 @@ namespace EventFlow
             serviceRegistration.Register<IAggregateFactory, AggregateFactory>();
             serviceRegistration.Register<IReadModelDomainEventApplier, ReadModelDomainEventApplier>();
             serviceRegistration.Register<IDomainEventPublisher, DomainEventPublisher>();
+            serviceRegistration.Register<IRecoveryHandlerProcessor, RecoveryHandlerProcessor>();
+            serviceRegistration.Register<IReliableMarkProcessor, NopReliableMarkProcessor>();
+            serviceRegistration.Register<IReadModelRecoveryHandler, NoRecoveryHandler>();
             serviceRegistration.Register<ISerializedCommandPublisher, SerializedCommandPublisher>();
             serviceRegistration.Register<ICommandDefinitionService, CommandDefinitionService>(Lifetime.Singleton);
             serviceRegistration.Register<IDispatchToEventSubscribers, DispatchToEventSubscribers>();

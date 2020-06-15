@@ -35,15 +35,15 @@ namespace EventFlow.PublishRecovery
         private const int PageSize = 200;
 
         private readonly IEventPersistence _eventPersistence;
-        private readonly IPublishRecoveryProcessor _publishRecoveryProcessor;
+        private readonly IRecoveryHandlerProcessor _recoveryHandlerProcessor;
         private readonly IEventJsonSerializer _eventSerializer;
         private readonly IRecoveryDetector _recoveryDetector;
         private readonly IReliablePublishPersistence _reliablePublishPersistence;
 
-        public PublishVerificator(IEventPersistence eventPersistence, IPublishRecoveryProcessor publishRecoveryProcessor, IEventJsonSerializer eventSerializer, IRecoveryDetector recoveryDetector, IReliablePublishPersistence reliablePublishPersistence)
+        public PublishVerificator(IEventPersistence eventPersistence, IRecoveryHandlerProcessor recoveryHandlerProcessor, IEventJsonSerializer eventSerializer, IRecoveryDetector recoveryDetector, IReliablePublishPersistence reliablePublishPersistence)
         {
             _eventPersistence = eventPersistence;
-            _publishRecoveryProcessor = publishRecoveryProcessor;
+            _recoveryHandlerProcessor = recoveryHandlerProcessor;
             _eventSerializer = eventSerializer;
             _recoveryDetector = recoveryDetector;
             _reliablePublishPersistence = reliablePublishPersistence;
@@ -69,7 +69,7 @@ namespace EventFlow.PublishRecovery
             {
                 // Do it inside transaction to recover in single thread
                 // success recovery should put LogItem
-                await _publishRecoveryProcessor.RecoverEventsAsync(eventsForRecovery, cancellationToken)
+                await _recoveryHandlerProcessor.RecoverAfterUnexpectedShutdownAsync(eventsForRecovery, cancellationToken)
                     .ConfigureAwait(false);
 
                 return PublishVerificationResult.RecoveredNeedVerify;

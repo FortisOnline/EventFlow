@@ -30,6 +30,7 @@ using EventFlow.Aggregates;
 using EventFlow.Configuration;
 using EventFlow.Extensions;
 using EventFlow.Logs;
+using EventFlow.PublishRecovery;
 
 namespace EventFlow.Sagas
 {
@@ -40,19 +41,22 @@ namespace EventFlow.Sagas
         private readonly ISagaStore _sagaStore;
         private readonly ISagaDefinitionService _sagaDefinitionService;
         private readonly ISagaErrorHandler _sagaErrorHandler;
+        private readonly IRecoveryHandlerProcessor _recoveryHandlerProcessor;
 
         public DispatchToSagas(
             ILog log,
             IResolver resolver,
             ISagaStore sagaStore,
             ISagaDefinitionService sagaDefinitionService,
-            ISagaErrorHandler sagaErrorHandler)
+            ISagaErrorHandler sagaErrorHandler,
+            IRecoveryHandlerProcessor recoveryHandlerProcessor)
         {
             _log = log;
             _resolver = resolver;
             _sagaStore = sagaStore;
             _sagaDefinitionService = sagaDefinitionService;
             _sagaErrorHandler = sagaErrorHandler;
+            _recoveryHandlerProcessor = recoveryHandlerProcessor;
         }
 
         public async Task ProcessAsync(
@@ -111,7 +115,20 @@ namespace EventFlow.Sagas
             }
             catch (Exception e)
             {
-                var handled = await _sagaErrorHandler.HandleAsync(
+                var handled = await _recoveryHandlerProcessor.RecoverSagaErrorAsync(
+                        sagaId,
+                        details,
+                        domainEvent,
+                        e,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (handled)
+                {
+                    return;
+                }
+
+                handled = await _sagaErrorHandler.HandleAsync(
                     sagaId,
                     details,
                     e,

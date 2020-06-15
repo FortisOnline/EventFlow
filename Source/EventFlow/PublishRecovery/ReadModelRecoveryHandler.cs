@@ -21,6 +21,7 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
@@ -29,16 +30,42 @@ using EventFlow.ReadStores;
 
 namespace EventFlow.PublishRecovery
 {
-    public abstract class ReadModelRecoveryHandler<TReadModel> : IReadModelRecoveryHandler<TReadModel>
+    public abstract class ReadModelRecoveryHandler<TReadModel> : IReadModelRecoveryHandler
         where TReadModel : class, IReadModel
     {
-        public virtual bool CanProcess(IDomainEvent domainEvent)
+        public Task RecoverFromShutdownAsync(IReadStoreManager readStoreManager, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            NextRecoverShutdownHandlerAsync nextHandler, CancellationToken cancellationToken)
         {
-            return ReadModelEventHelper<TReadModel>.CanApply(domainEvent);
+            if (readStoreManager.ReadModelType == typeof(TReadModel))
+            {
+                return InternalRecoverFromShutdownAsync(readStoreManager, eventsForRecovery, nextHandler, cancellationToken);
+            }
+
+            return nextHandler(readStoreManager, eventsForRecovery, cancellationToken);
         }
 
-        public abstract Task RecoverFromShutdownAsync(
+        public Task<bool> RecoverFromErrorAsync(IReadStoreManager readStoreManager, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            Exception exception, NextRecoverErrorHandlerAsync nextHandler, CancellationToken cancellationToken)
+        {
+            if (readStoreManager.ReadModelType == typeof(TReadModel))
+            {
+                return InternalRecoverFromErrorAsync(readStoreManager, eventsForRecovery, exception, nextHandler, cancellationToken);
+            }
+
+            return nextHandler(readStoreManager, eventsForRecovery, exception, cancellationToken);
+        }
+
+        protected abstract Task InternalRecoverFromShutdownAsync(
+            IReadStoreManager readStoreManager,
             IReadOnlyCollection<IDomainEvent> domainEvents,
+            NextRecoverShutdownHandlerAsync nextHandler,
+            CancellationToken cancellationToken);
+
+        protected abstract Task<bool> InternalRecoverFromErrorAsync(
+            IReadStoreManager readStoreManager,
+            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            Exception exception,
+            NextRecoverErrorHandlerAsync nextHandler,
             CancellationToken cancellationToken);
     }
 }

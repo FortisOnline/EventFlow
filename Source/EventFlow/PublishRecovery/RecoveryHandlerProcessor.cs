@@ -28,51 +28,152 @@ using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
 using EventFlow.Configuration;
+using EventFlow.ReadStores;
+using EventFlow.Sagas;
 
 namespace EventFlow.PublishRecovery
 {
-    public sealed class RecoveryHandlerProcessor : IPublishRecoveryProcessor
+    public sealed class RecoveryHandlerProcessor : IRecoveryHandlerProcessor
     {
         private readonly IReliableMarkProcessor _markProcessor;
         private readonly IResolver _resolver;
+        private readonly IReadOnlyCollection<IReadStoreManager> _readStoreManagers;
 
-        public RecoveryHandlerProcessor(IResolver resolver, IReliableMarkProcessor markProcessor)
+        public RecoveryHandlerProcessor(
+            IResolver resolver,
+            IReliableMarkProcessor markProcessor,
+            IEnumerable<IReadStoreManager> readStoreManagers)
         {
             _resolver = resolver;
             _markProcessor = markProcessor;
+            _readStoreManagers = readStoreManagers.ToList();
         }
 
-        public async Task RecoverEventsAsync(IReadOnlyList<IDomainEvent> eventsForRecovery, CancellationToken cancellationToken)
+        public async Task RecoverAfterUnexpectedShutdownAsync(IReadOnlyList<IDomainEvent> eventsForRecovery, CancellationToken cancellationToken)
         {
-            var recoveryHandlers = _resolver.Resolve<IEnumerable<IRecoveryHandler>>();
+            cancellationToken.ThrowIfCancellationRequested();
 
-            if (!recoveryHandlers.Any())
+            foreach (var readStoreManager in _readStoreManagers)
             {
-                throw new Exception("No any recovery handlers registered.");
+                await RecoverReadModelUpdateAfterShutdownAsync(readStoreManager, eventsForRecovery, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
-            var anyRecovered = false;
+            cancellationToken.ThrowIfCancellationRequested();
 
-            foreach (var handler in recoveryHandlers)
-            {
-                var events = eventsForRecovery
-                    .Where(evnt => handler.CanProcess(evnt))
-                    .ToList();
-
-                if (events.Any())
-                {
-                    anyRecovered = true;
-                    await handler.RecoverFromShutdownAsync(events, cancellationToken).ConfigureAwait(false);
-                }
-            }
-
-            if (!anyRecovered)
-            {
-                throw new Exception("No events recovered");
-            }
-
-            // TODO: Rethink as now we mark as recovered all events even no suitable recovery handler found.
             await _markProcessor.MarkEventsPublishedAsync(eventsForRecovery).ConfigureAwait(false);
+        }
+
+        public Task<bool> RecoverReadModelUpdateErrorAsync(
+            IReadStoreManager readModelType,
+            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            Exception exception,
+            CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromResult(false);
+            }
+
+            var recoveryHandlers = _resolver.Resolve<IEnumerable<IReadModelRecoveryHandler>>().ToList();
+
+            var wrapper = new MiddlewareWrapper(recoveryHandlers);
+
+            return wrapper.RecoverFromErrorAsync(readModelType, eventsForRecovery, exception, cancellationToken);
+        }
+
+        public Task<bool> RecoverAllSubscriberErrorAsync(IReadOnlyCollection<IDomainEvent> eventsForRecovery, Exception exception,
+            CancellationToken cancellationToken)
+        {
+            // TODO: Implement
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> RecoverSubscriberErrorAsync(object subscriber, IDomainEvent eventForRecovery, Exception exception,
+            CancellationToken cancellationToken)
+        {
+            // TODO: Implement
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> RecoverScheduleSubscriberErrorAsync(IReadOnlyCollection<IDomainEvent> eventsForRecovery, Exception exception,
+            CancellationToken cancellationToken)
+        {
+            // TODO: Implement
+            return Task.FromResult(false);
+        }
+
+        public Task<bool> RecoverSagaErrorAsync(ISagaId eventsForRecovery, SagaDetails exception, IDomainEvent cancellationToken,
+            Exception exception1, CancellationToken cancellationToken1)
+        {
+            // TODO: Implement
+            return Task.FromResult(false);
+        }
+
+        private Task RecoverReadModelUpdateAfterShutdownAsync(
+            IReadStoreManager readModelType,
+            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+            CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromResult(false);
+            }
+
+            var recoveryHandlers = _resolver.Resolve<IEnumerable<IReadModelRecoveryHandler>>().ToList();
+
+            var wrapper = new MiddlewareWrapper(recoveryHandlers);
+
+            return wrapper.RecoverFromShutdownAsync(readModelType, eventsForRecovery, cancellationToken);
+        }
+
+        private sealed class MiddlewareWrapper
+        {
+            private readonly IReadOnlyList<IReadModelRecoveryHandler> _handlers;
+            private readonly int _position;
+
+            public MiddlewareWrapper(IReadOnlyList<IReadModelRecoveryHandler> handlers, int position = 0)
+            {
+                _handlers = handlers;
+                _position = position;
+            }
+
+            public Task RecoverFromShutdownAsync(
+                IReadStoreManager readStoreManager,
+                IReadOnlyCollection<IDomainEvent> domainEvents,
+                CancellationToken cancellationToken)
+            {
+                if (_handlers.Count >= _position)
+                {
+                    return Task.FromResult(false);
+                }
+
+                return _handlers[_position].RecoverFromShutdownAsync(
+                    readStoreManager,
+                    domainEvents,
+                    new MiddlewareWrapper(_handlers, _position + 1).RecoverFromShutdownAsync,
+                    cancellationToken);
+            }
+
+
+            public Task<bool> RecoverFromErrorAsync(
+                IReadStoreManager readStoreManager,
+                IReadOnlyCollection<IDomainEvent> eventsForRecovery,
+                Exception exception,
+                CancellationToken cancellationToken)
+            {
+                if (_handlers.Count >= _position)
+                {
+                    return Task.FromResult(false);
+                }
+
+                return _handlers[_position].RecoverFromErrorAsync(
+                    readStoreManager,
+                    eventsForRecovery,
+                    exception,
+                    new MiddlewareWrapper(_handlers, _position + 1).RecoverFromErrorAsync,
+                    cancellationToken);
+            }
         }
     }
 }

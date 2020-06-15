@@ -37,20 +37,19 @@ namespace EventFlow.Extensions
             return eventFlowOptions
                 .RegisterServices(f => f.Register<IReliableMarkProcessor, ReliableMarkProcessor>())
                 .RegisterServices(f => f.Register<IPublishVerificator, PublishVerificator>())
-                .RegisterServices(f => f.Register<IPublishRecoveryProcessor, RecoveryHandlerProcessor>())
                 .RegisterServices(r => r.Register<IRecoveryDetector, TimeBasedRecoveryDetector>())
                 .RegisterServices(f => f.Register<IReliablePublishPersistence, TReliablePublishPersistence>(lifetime))
                 .RegisterServices(f => f.Decorate<IDomainEventPublisher>(
                                       (context, inner) => new ReliableDomainEventPublisher(inner, context.Resolver.Resolve<IReliableMarkProcessor>())));
         }
 
-        public static IEventFlowOptions UseRecoveryHandler<TRecoveryHandler>(
+        public static IEventFlowOptions UseReadModelRecoveryHandler<TRecoveryHandler>(
             this IEventFlowOptions eventFlowOptions,
             Lifetime lifetime = Lifetime.AlwaysUnique)
-            where TRecoveryHandler : class, IRecoveryHandler
+            where TRecoveryHandler : class, IReadModelRecoveryHandler
         {
             return eventFlowOptions
-                .RegisterServices(f => f.Register<IRecoveryHandler, TRecoveryHandler>(lifetime));
+                .RegisterServices(f => f.Register<IReadModelRecoveryHandler, TRecoveryHandler>(lifetime));
         }
     }
 }

@@ -22,26 +22,16 @@
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 using System.Collections.Generic;
-using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
-using EventFlow.ReadStores;
 
 namespace EventFlow.PublishRecovery
 {
-    public class ApplyRecoveryHandler<TReadModel> : ReadModelRecoveryHandler<TReadModel>
-        where TReadModel : class, IReadModel
+    public sealed class NopReliableMarkProcessor : IReliableMarkProcessor
     {
-        private readonly IReadStoreManager<TReadModel> _storeManager;
-
-        public ApplyRecoveryHandler(IReadStoreManager<TReadModel> storeManager)
+        public Task MarkEventsPublishedAsync(IReadOnlyCollection<IDomainEvent> domainEvents)
         {
-            _storeManager = storeManager;
-        }
-
-        public override Task RecoverFromShutdownAsync(IReadOnlyCollection<IDomainEvent> domainEvents, CancellationToken cancellationToken)
-        {
-            return _storeManager.UpdateReadStoresAsync(domainEvents, cancellationToken);
+            return Task.FromResult(0);
         }
     }
 }
