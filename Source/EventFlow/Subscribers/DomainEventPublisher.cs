@@ -122,7 +122,7 @@ namespace EventFlow.Subscribers
         }
 
         private async Task PublishToAsynchronousSubscribersAsync(
-            IReadOnlyCollection<IDomainEvent> domainEvents,
+            IEnumerable<IDomainEvent> domainEvents,
             CancellationToken cancellationToken)
         {
             if (_eventFlowConfiguration.IsAsynchronousSubscribersEnabled)

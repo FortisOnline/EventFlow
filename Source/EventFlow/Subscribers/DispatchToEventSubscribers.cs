@@ -114,16 +114,10 @@ namespace EventFlow.Subscribers
                 {
                     await subscriberInfomation.HandleMethod(subscriber, domainEvent, cancellationToken).ConfigureAwait(false);
                 }
-                catch (Exception e)
+                catch (Exception e) when (swallowException)
                 {
-                    if (swallowException)
-                    {
-                        _log.Error(e, $"Subscriber '{subscriberInfomation.SubscriberType.PrettyPrint()}' threw " +
-                                      $"'{e.GetType().PrettyPrint()}' while handling '{domainEvent.EventType.PrettyPrint()}': {e.Message}");
-                        continue;
-                    }
-
-                    throw;
+                    _log.Error(e, $"Subscriber '{subscriberInfomation.SubscriberType.PrettyPrint()}' threw " +
+                                  $"'{e.GetType().PrettyPrint()}' while handling '{domainEvent.EventType.PrettyPrint()}': {e.Message}");
                 }
             }
         }

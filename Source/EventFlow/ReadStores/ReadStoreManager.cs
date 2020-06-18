@@ -79,7 +79,7 @@ namespace EventFlow.ReadStores
             {
                 return false;
             }
-
+            
             var typeDefinition = i.GetGenericTypeDefinition();
             return typeDefinition == typeof(IAmReadModelFor<,,>) ||
                    typeDefinition == typeof(IAmAsyncReadModelFor<,,>);
