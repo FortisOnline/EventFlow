@@ -23,6 +23,7 @@
 
 using EventFlow.Configuration;
 using EventFlow.PublishRecovery;
+using EventFlow.ReadStores;
 using EventFlow.Subscribers;
 
 namespace EventFlow.Extensions
@@ -43,13 +44,31 @@ namespace EventFlow.Extensions
                                       (context, inner) => new ReliableDomainEventPublisher(inner, context.Resolver.Resolve<IReliableMarkProcessor>())));
         }
 
-        public static IEventFlowOptions UseReadModelRecoveryHandler<TRecoveryHandler>(
+        public static IEventFlowOptions UseReadModelRecoveryHandler<TReadModel, TRecoveryHandler>(
             this IEventFlowOptions eventFlowOptions,
             Lifetime lifetime = Lifetime.AlwaysUnique)
-            where TRecoveryHandler : class, IReadModelRecoveryHandler
+            where TRecoveryHandler : class, IReadModelRecoveryHandler<TReadModel>
+            where TReadModel : class, IReadModel
         {
             return eventFlowOptions
-                .RegisterServices(f => f.Register<IReadModelRecoveryHandler, TRecoveryHandler>(lifetime));
+                .RegisterServices(f =>
+                {
+                    f.Register<IReadModelRecoveryHandler<TReadModel>, TRecoveryHandler>(lifetime);
+
+                    f.Register(ctx => (IReadModelRecoveryHandler)ctx.Resolver.Resolve<IReadModelRecoveryHandler<TReadModel>>());
+
+                    f.Decorate<IReadStoreManager>((ctx, inner) =>
+                    {
+                        if (inner.ReadModelType == typeof(TReadModel))
+                        {
+                            return new ReadStoreManagerWithErrorRecovery<TReadModel>(
+                                (IReadStoreManager<TReadModel>)inner,
+                                ctx.Resolver.Resolve<IReadModelRecoveryHandler<TReadModel>>());
+                        }
+
+                        return inner;
+                    });
+                });
         }
     }
 }

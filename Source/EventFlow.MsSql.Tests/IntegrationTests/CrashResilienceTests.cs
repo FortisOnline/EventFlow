@@ -32,8 +32,6 @@ using EventFlow.Extensions;
 using EventFlow.MsSql.Extensions;
 using EventFlow.MsSql.ReliablePublish;
 using EventFlow.PublishRecovery;
-using EventFlow.ReadStores;
-using EventFlow.Sagas;
 using EventFlow.Subscribers;
 using EventFlow.TestHelpers;
 using EventFlow.TestHelpers.Aggregates;
@@ -131,12 +129,6 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             _recoveryHandler.RecoveredEvents.Should().BeEmpty();
         }
 
-        [Test]
-        public void ShouldRemoveOutdatedLogItems()
-        {
-            throw new NotImplementedException();
-        }
-
         private async Task Verify()
         {
             PublishVerificationResult result;
@@ -164,36 +156,6 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
                 return _markProcessor.MarkEventsPublishedAsync(eventsForRecovery);
             }
-
-            public Task<bool> RecoverReadModelUpdateErrorAsync(IReadStoreManager readModelType, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
-                Exception exception, CancellationToken cancellationToken)
-            {
-                throw new NotImplementedException();
-            }
-
-            public Task<bool> RecoverAllSubscriberErrorAsync(IReadOnlyCollection<IDomainEvent> eventsForRecovery, Exception exception,
-                CancellationToken cancellationToken)
-            {
-                throw new NotImplementedException();
-            }
-
-            public Task<bool> RecoverSubscriberErrorAsync(object subscriber, IDomainEvent eventForRecovery, Exception exception,
-                CancellationToken cancellationToken)
-            {
-                throw new NotImplementedException();
-            }
-
-            public Task<bool> RecoverScheduleSubscriberErrorAsync(IReadOnlyCollection<IDomainEvent> eventsForRecovery, Exception exception,
-                CancellationToken cancellationToken)
-            {
-                throw new NotImplementedException();
-            }
-
-            public Task<bool> RecoverSagaErrorAsync(ISagaId eventsForRecovery, SagaDetails exception, IDomainEvent cancellationToken,
-                Exception exception1, CancellationToken cancellationToken1)
-            {
-                throw new NotImplementedException();
-            }
         }
 
         private class TestPublisher : IDomainEventPublisher
@@ -213,7 +175,8 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
 
             public IReadOnlyList<IDomainEvent> NotPublishedEvents => _notPublishedEvents;
 
-            public async Task PublishAsync(IReadOnlyCollection<IDomainEvent> domainEvents, CancellationToken cancellationToken)
+            public async Task PublishAsync(IReadOnlyCollection<IDomainEvent> domainEvents,
+                CancellationToken cancellationToken)
             {
                 if (SimulatePublishFailure)
                 {
@@ -227,26 +190,12 @@ namespace EventFlow.MsSql.Tests.IntegrationTests
             }
 
             [Obsolete("Use PublishAsync (without generics and aggregate identity)")]
-            public Task PublishAsync<TAggregate, TIdentity>(TIdentity id, IReadOnlyCollection<IDomainEvent> domainEvents,
-                CancellationToken cancellationToken) where TAggregate : IAggregateRoot<TIdentity> where TIdentity : IIdentity
+            public Task PublishAsync<TAggregate, TIdentity>(TIdentity id,
+                IReadOnlyCollection<IDomainEvent> domainEvents,
+                CancellationToken cancellationToken) where TAggregate : IAggregateRoot<TIdentity>
+                where TIdentity : IIdentity
             {
                 return _inner.PublishAsync<TAggregate, TIdentity>(id, domainEvents, cancellationToken);
-            }
-
-            private sealed class CompareEventById : IEqualityComparer<IDomainEvent>
-            {
-                public static CompareEventById Instance { get; } = new CompareEventById();
-
-                public bool Equals(IDomainEvent x, IDomainEvent y)
-                {
-                    return Equals(x.GetIdentity(), y.GetIdentity()) &&
-                        x.AggregateSequenceNumber == y.AggregateSequenceNumber;
-                }
-
-                public int GetHashCode(IDomainEvent obj)
-                {
-                    return HashHelper.Combine(obj.AggregateSequenceNumber, obj.GetIdentity().GetHashCode());
-                }
             }
         }
 

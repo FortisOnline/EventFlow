@@ -21,13 +21,10 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
-using EventFlow.ReadStores;
-using EventFlow.Sagas;
 
 namespace EventFlow.PublishRecovery
 {
@@ -36,33 +33,5 @@ namespace EventFlow.PublishRecovery
         Task RecoverAfterUnexpectedShutdownAsync(
             IReadOnlyList<IDomainEvent> eventsForRecovery,
             CancellationToken cancellationToken);
-
-        Task<bool> RecoverReadModelUpdateErrorAsync(IReadStoreManager readModelType,
-            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
-            Exception exception,
-            CancellationToken cancellationToken);
-
-        Task<bool> RecoverAllSubscriberErrorAsync(
-            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
-            Exception exception,
-            CancellationToken cancellationToken);
-
-        Task<bool> RecoverSubscriberErrorAsync(
-            object subscriber,
-            IDomainEvent eventForRecovery,
-            Exception exception,
-            CancellationToken cancellationToken);
-
-        Task<bool> RecoverScheduleSubscriberErrorAsync(
-            IReadOnlyCollection<IDomainEvent> eventsForRecovery,
-            Exception exception,
-            CancellationToken cancellationToken);
-
-        Task<bool> RecoverSagaErrorAsync(
-            ISagaId eventsForRecovery,
-            SagaDetails exception,
-            IDomainEvent cancellationToken,
-            Exception exception1,
-            CancellationToken cancellationToken1);
     }
 }

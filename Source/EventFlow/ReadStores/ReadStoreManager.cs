@@ -25,7 +25,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using EventFlow.Aggregates;
@@ -41,6 +41,7 @@ namespace EventFlow.ReadStores
     {
         // ReSharper disable StaticMemberInGenericType
         private static readonly Type StaticReadModelType = typeof(TReadModel);
+        private static readonly ISet<Type> AggregateEventTypes;
         // ReSharper enable StaticMemberInGenericType
 
         protected ILog Log { get; }
@@ -53,7 +54,35 @@ namespace EventFlow.ReadStores
 
         static ReadStoreManager()
         {
-            ReadModelEventHelper<TReadModel>.CheckReadModel();
+            var iAmReadModelForInterfaceTypes = StaticReadModelType
+                .GetTypeInfo()
+                .GetInterfaces()
+                .Where(IsReadModelFor)
+                .ToList();
+            if (!iAmReadModelForInterfaceTypes.Any())
+            {
+                throw new ArgumentException(
+                    $"Read model type '{StaticReadModelType.PrettyPrint()}' does not implement any '{typeof(IAmReadModelFor<,,>).PrettyPrint()}'");
+            }
+
+            AggregateEventTypes = new HashSet<Type>(iAmReadModelForInterfaceTypes.Select(i => i.GetTypeInfo().GetGenericArguments()[2]));
+            if (AggregateEventTypes.Count != iAmReadModelForInterfaceTypes.Count)
+            {
+                throw new ArgumentException(
+                    $"Read model type '{StaticReadModelType.PrettyPrint()}' implements ambiguous '{typeof(IAmReadModelFor<,,>).PrettyPrint()}' interfaces");
+            }
+        }
+
+        private static bool IsReadModelFor(Type i)
+        {
+            if (!i.GetTypeInfo().IsGenericType)
+            {
+                return false;
+            }
+
+            var typeDefinition = i.GetGenericTypeDefinition();
+            return typeDefinition == typeof(IAmReadModelFor<,,>) ||
+                   typeDefinition == typeof(IAmAsyncReadModelFor<,,>);
         }
 
         protected ReadStoreManager(
@@ -75,7 +104,7 @@ namespace EventFlow.ReadStores
             CancellationToken cancellationToken)
         {
             var relevantDomainEvents = domainEvents
-                .Where(e => ReadModelEventHelper<TReadModel>.CanApply(e.EventType))
+                .Where(e => AggregateEventTypes.Contains(e.EventType))
                 .ToList();
             if (!relevantDomainEvents.Any())
             {

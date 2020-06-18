@@ -30,30 +30,20 @@ using EventFlow.ReadStores;
 
 namespace EventFlow.PublishRecovery
 {
-    public delegate Task NextRecoverShutdownHandlerAsync(
-        IReadStoreManager readStoreManager,
-        IReadOnlyCollection<IDomainEvent> domainEvents,
-        CancellationToken cancellationToken);
-
-    public delegate Task<bool> NextRecoverErrorHandlerAsync(
-        IReadStoreManager readStoreManager,
-        IReadOnlyCollection<IDomainEvent> domainEvents,
-        Exception exception,
-        CancellationToken cancellationToken);
-
     public interface IReadModelRecoveryHandler
     {
         Task RecoverFromShutdownAsync(
-            IReadStoreManager readStoreManager,
             IReadOnlyCollection<IDomainEvent> eventsForRecovery,
-            NextRecoverShutdownHandlerAsync nextHandler,
             CancellationToken cancellationToken);
 
         Task<bool> RecoverFromErrorAsync(
-            IReadStoreManager readStoreManager,
             IReadOnlyCollection<IDomainEvent> eventsForRecovery,
             Exception exception,
-            NextRecoverErrorHandlerAsync nextHandler,
             CancellationToken cancellationToken);
+    }
+
+    public interface IReadModelRecoveryHandler<TReadModel> : IReadModelRecoveryHandler
+        where TReadModel : class, IReadModel
+    {
     }
 }

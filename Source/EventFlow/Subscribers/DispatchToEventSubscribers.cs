@@ -33,7 +33,6 @@ using EventFlow.Core;
 using EventFlow.Core.Caching;
 using EventFlow.Extensions;
 using EventFlow.Logs;
-using EventFlow.PublishRecovery;
 
 namespace EventFlow.Subscribers
 {
@@ -46,7 +45,6 @@ namespace EventFlow.Subscribers
         private readonly IResolver _resolver;
         private readonly IEventFlowConfiguration _eventFlowConfiguration;
         private readonly IMemoryCache _memoryCache;
-        private readonly IRecoveryHandlerProcessor _recoveryHandlerProcessor;
 
         private class SubscriberInfomation
         {
@@ -58,14 +56,12 @@ namespace EventFlow.Subscribers
             ILog log,
             IResolver resolver,
             IEventFlowConfiguration eventFlowConfiguration,
-            IMemoryCache memoryCache,
-            IRecoveryHandlerProcessor recoveryHandlerProcessor)
+            IMemoryCache memoryCache)
         {
             _log = log;
             _resolver = resolver;
             _eventFlowConfiguration = eventFlowConfiguration;
             _memoryCache = memoryCache;
-            _recoveryHandlerProcessor = recoveryHandlerProcessor;
         }
 
         public async Task DispatchToSynchronousSubscribersAsync(
@@ -120,18 +116,6 @@ namespace EventFlow.Subscribers
                 }
                 catch (Exception e)
                 {
-                    var handled = await _recoveryHandlerProcessor.RecoverSubscriberErrorAsync(
-                            subscriber,
-                            domainEvent,
-                            e,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (handled)
-                    {
-                        continue;
-                    }
-
                     if (swallowException)
                     {
                         _log.Error(e, $"Subscriber '{subscriberInfomation.SubscriberType.PrettyPrint()}' threw " +

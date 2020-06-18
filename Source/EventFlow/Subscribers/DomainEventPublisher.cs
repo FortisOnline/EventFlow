@@ -21,7 +21,6 @@
 // IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 // CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -32,7 +31,6 @@ using EventFlow.Configuration.Cancellation;
 using EventFlow.Core;
 using EventFlow.Jobs;
 using EventFlow.Provided.Jobs;
-using EventFlow.PublishRecovery;
 using EventFlow.ReadStores;
 using EventFlow.Sagas;
 
@@ -48,7 +46,6 @@ namespace EventFlow.Subscribers
         private readonly ICancellationConfiguration _cancellationConfiguration;
         private readonly IReadOnlyCollection<ISubscribeSynchronousToAll> _subscribeSynchronousToAlls;
         private readonly IReadOnlyCollection<IReadStoreManager> _readStoreManagers;
-        private readonly IRecoveryHandlerProcessor _recoveryHandlerProcessor;
 
         public DomainEventPublisher(
             IDispatchToEventSubscribers dispatchToEventSubscribers,
@@ -58,8 +55,7 @@ namespace EventFlow.Subscribers
             IEventFlowConfiguration eventFlowConfiguration,
             IEnumerable<IReadStoreManager> readStoreManagers,
             IEnumerable<ISubscribeSynchronousToAll> subscribeSynchronousToAlls,
-            ICancellationConfiguration cancellationConfiguration,
-            IRecoveryHandlerProcessor recoveryHandlerProcessor)
+            ICancellationConfiguration cancellationConfiguration)
         {
             _dispatchToEventSubscribers = dispatchToEventSubscribers;
             _dispatchToSagas = dispatchToSagas;
@@ -67,7 +63,6 @@ namespace EventFlow.Subscribers
             _resolver = resolver;
             _eventFlowConfiguration = eventFlowConfiguration;
             _cancellationConfiguration = cancellationConfiguration;
-            _recoveryHandlerProcessor = recoveryHandlerProcessor;
             _subscribeSynchronousToAlls = subscribeSynchronousToAlls.ToList();
             _readStoreManagers = readStoreManagers.ToList();
         }
@@ -106,26 +101,7 @@ namespace EventFlow.Subscribers
             CancellationToken cancellationToken)
         {
             var updateReadStoresTasks = _readStoreManagers
-                .Select(async rsm =>
-                {
-                    try
-                    {
-                        await rsm.UpdateReadStoresAsync(domainEvents, cancellationToken).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        var handled = await _recoveryHandlerProcessor
-                            .RecoverReadModelUpdateErrorAsync(rsm, domainEvents, ex, cancellationToken)
-                            .ConfigureAwait(false);
-
-                        if (handled)
-                        {
-                            return;
-                        }
-
-                        throw;
-                    }
-                });
+                .Select(rsm => rsm.UpdateReadStoresAsync(domainEvents, cancellationToken));
             await Task.WhenAll(updateReadStoresTasks).ConfigureAwait(false);
         }
 
@@ -134,28 +110,7 @@ namespace EventFlow.Subscribers
             CancellationToken cancellationToken)
         {
             var handle = _subscribeSynchronousToAlls
-                .Select(async s =>
-                {
-                    try
-                    {
-                        await s.HandleAsync(domainEvents, cancellationToken).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        var handled = await _recoveryHandlerProcessor.RecoverAllSubscriberErrorAsync(
-                            domainEvents,
-                            ex,
-                            cancellationToken)
-                            .ConfigureAwait(false);
-
-                        if (handled)
-                        {
-                            return;
-                        }
-
-                        throw;
-                    }
-                });
+                .Select(s => s.HandleAsync(domainEvents, cancellationToken));
             await Task.WhenAll(handle).ConfigureAwait(false);
         }
 
@@ -172,29 +127,10 @@ namespace EventFlow.Subscribers
         {
             if (_eventFlowConfiguration.IsAsynchronousSubscribersEnabled)
             {
-                try
-                {
-                    await Task.WhenAll(domainEvents.Select(
-                                           d => _jobScheduler.ScheduleNowAsync(
-                                               DispatchToAsynchronousEventSubscribersJob.Create(d, _resolver),
-                                               cancellationToken)))
-                        .ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    var handled = await _recoveryHandlerProcessor.RecoverScheduleSubscriberErrorAsync(
-                            domainEvents,
-                            ex,
-                            cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (handled)
-                    {
-                        return;
-                    }
-
-                    throw;
-                }
+                await Task.WhenAll(domainEvents.Select(
+                        d => _jobScheduler.ScheduleNowAsync(
+                            DispatchToAsynchronousEventSubscribersJob.Create(d, _resolver), cancellationToken)))
+                    .ConfigureAwait(false);
             }
         }
 

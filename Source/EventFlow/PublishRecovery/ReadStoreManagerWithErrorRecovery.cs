@@ -30,18 +30,35 @@ using EventFlow.ReadStores;
 
 namespace EventFlow.PublishRecovery
 {
-    public sealed class NoRecoveryHandler : IReadModelRecoveryHandler
+    public sealed class ReadStoreManagerWithErrorRecovery<TReadModel> : IReadStoreManager<TReadModel>
+        where TReadModel : class, IReadModel
     {
-        public Task RecoverFromShutdownAsync(IReadStoreManager readStoreManager, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
-            NextRecoverShutdownHandlerAsync nextHandler, CancellationToken cancellationToken)
+        private readonly IReadStoreManager<TReadModel> _original;
+        private readonly IReadModelRecoveryHandler<TReadModel> _recoveryHandler;
+
+        public ReadStoreManagerWithErrorRecovery(IReadStoreManager<TReadModel> original, IReadModelRecoveryHandler<TReadModel> recoveryHandler)
         {
-            throw new NotSupportedException("Unable to recover after shutdown.");
+            _original = original;
+            _recoveryHandler = recoveryHandler;
         }
 
-        public Task<bool> RecoverFromErrorAsync(IReadStoreManager readStoreManager, IReadOnlyCollection<IDomainEvent> eventsForRecovery,
-            Exception exception, NextRecoverErrorHandlerAsync nextHandler, CancellationToken cancellationToken)
+        public Type ReadModelType => _original.ReadModelType;
+
+        public async Task UpdateReadStoresAsync(IReadOnlyCollection<IDomainEvent> domainEvents, CancellationToken cancellationToken)
         {
-            return Task.FromResult(false);
+            try
+            {
+                await _original.UpdateReadStoresAsync(domainEvents, cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                var handled = await _recoveryHandler.RecoverFromErrorAsync(domainEvents, ex, cancellationToken);
+
+                if (!handled)
+                {
+                    throw;
+                }
+            }
         }
     }
 }
