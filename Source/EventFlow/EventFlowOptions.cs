@@ -217,8 +217,6 @@ namespace EventFlow
             serviceRegistration.Register<IAggregateFactory, AggregateFactory>();
             serviceRegistration.Register<IReadModelDomainEventApplier, ReadModelDomainEventApplier>();
             serviceRegistration.Register<IDomainEventPublisher, DomainEventPublisher>();
-            serviceRegistration.Register<IRecoveryHandlerProcessor, RecoveryHandlerProcessor>();
-            serviceRegistration.Register<IReliableMarkProcessor, NopReliableMarkProcessor>();
             serviceRegistration.Register<ISerializedCommandPublisher, SerializedCommandPublisher>();
             serviceRegistration.Register<ICommandDefinitionService, CommandDefinitionService>(Lifetime.Singleton);
             serviceRegistration.Register<IDispatchToEventSubscribers, DispatchToEventSubscribers>();

@@ -36,6 +36,7 @@ namespace EventFlow.Extensions
             where TReliablePublishPersistence : class, IReliablePublishPersistence
         {
             return eventFlowOptions
+                .RegisterServices(f => f.Register<IRecoveryHandlerProcessor, RecoveryHandlerProcessor>())
                 .RegisterServices(f => f.Register<IReliableMarkProcessor, ReliableMarkProcessor>())
                 .RegisterServices(f => f.Register<IPublishVerificator, PublishVerificator>())
                 .RegisterServices(r => r.Register<IRecoveryDetector, TimeBasedRecoveryDetector>())

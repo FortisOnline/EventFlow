@@ -28,13 +28,13 @@ namespace EventFlow.PublishRecovery
 {
     public class VerificationState
     {
-        public VerificationState(GlobalPosition position, IReadOnlyCollection<IPublishVerificationItem> items)
+        public VerificationState(GlobalPosition lastVerifiedPosition, IReadOnlyCollection<IPublishVerificationItem> items)
         {
-            Position = position;
+            LastVerifiedPosition = lastVerifiedPosition;
             Items = items;
         }
 
-        public GlobalPosition Position { get; }
+        public GlobalPosition LastVerifiedPosition { get; }
 
         public IReadOnlyCollection<IPublishVerificationItem> Items { get; }
     }

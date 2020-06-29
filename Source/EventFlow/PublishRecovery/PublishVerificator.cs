@@ -56,7 +56,7 @@ namespace EventFlow.PublishRecovery
 
             var logItemLookup = state.Items.ToLookup(x => x.AggregateId);
 
-            var page = await _eventPersistence.LoadAllCommittedEvents(state.Position, PageSize, cancellationToken)
+            var page = await _eventPersistence.LoadAllCommittedEvents(state.LastVerifiedPosition, PageSize, cancellationToken)
                 .ConfigureAwait(false);
 
             var verifyResult = VerifyDomainEvents(page, logItemLookup);
@@ -65,7 +65,7 @@ namespace EventFlow.PublishRecovery
             // but we have to check them again on next iteration
             var eventsForRecovery = GetEventsForRecovery(verifyResult.UnpublishedEvents);
 
-            if (eventsForRecovery.Count > 0)
+            if (eventsForRecovery.Any())
             {
                 // Do it inside transaction to recover in single thread
                 // success recovery should put LogItem
